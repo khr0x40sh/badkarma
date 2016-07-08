@@ -17,7 +17,6 @@ def log(text):
 	"This prints info to screen."
 	print "[!] " + text
 	return;
-
 def runcommand(command1):
 	"This runs a command."
 
@@ -25,31 +24,20 @@ def runcommand(command1):
 	(output,errput)=Temp.communicate()
 	return_value=Temp.wait()
 	return errput + output;
-def runmdk3_nowait(command1):
-	"This runs a command and does not wait for or capture output."
-	with open ("mdk3.log", "w+") as out, open("stderr.txt", "w+") as err:
-		Popen(command1.split(),stdout=out,stdin=None,stderr=err)
-	return;
-def getmoninterface(input):
-	for line in input.split('\n'):
-        	if "monitor mode enabled on" in line:
-			tmp=line.rsplit(None, 1)
-               		tmpmon=tmp[-1].strip()[:-1]
-			intmon=tmpmon.strip()
-			log ("Monitor active on interface " + intmon)
-	return intmon;
 def setstage():
 	"This sets up required interfaces, etc"
-	log("Stopping network-manager..")
+	log("Stopping network-manager...")
 	runcommand("service network-manager stop")
-	log("Starting monitor interface..")
-	output=runcommand("airmon-ng start " + interface)
-	if "monitor mode enabled on" in output:
-		intmon=getmoninterface(output)
-		runcommand("touch blacklist")
-	else:
-		log (output)
-		sys.exit(-1)
+	log("Starting hostapd...")
+	runcommand("hostapd -B -P /var/run/hostapd.pid /etc/hostapd/hostapd.conf")
+	#log("Starting monitor interface..")
+	#output=runcommand("airmon-ng start " + interface)
+	#if "monitor mode enabled on" in output:
+	#	intmon=getmoninterface(output)
+	#	runcommand("touch blacklist")
+	#else:
+	#	log (output)
+	#	sys.exit(-1)
 	return;
 def readmdk3():
 	with open ("mdk3.log", "rU") as myfile:
@@ -73,18 +61,21 @@ def createSSID():
 		word2=(random.choice(words))
 	essid=word1+word2
 	log ("ESSID is now " + essid)
-	output=runcommand ("mv blacklist blacklist-wait")
 	output=runcommand ("ifconfig " + interface + " down")
+	output=runcommand ("hostapd_cli wps_config " + essid + " OPEN NONE 12345670")
 	if "No such device" in output:
         	log (output)
 	        log ("Exiting...")
 		sys.exit(-1)
-	else:
+	else:	
 		output=runcommand ("macchanger -r " + interface)
 		printnewmac(output)
-		output=runcommand("iwconfig " + interface + " essid " + essid)
-		output=runcommand("ifconfig " + interface + " up")
-		output=runcommand("mv blacklist-wait blacklist")
+		#kill and restart hostapd
+		output=runcommand("cat /var/run/hostapd.pid")
+		runcommand("kill " + output)
+		log("Attempting to kill "+output+"...")
+		time.sleep(1)	
+		output=runcommand("hostapd -B -P /var/run/hostapd.pid /etc/hostapd/hostapd.conf")
 	return;
 def lookforjoin():
 	"This checks iwconfig for mac indicating join"
@@ -134,13 +125,13 @@ if "Device not found" in output:#
 else:
 	try:
 		setstage();
-		time.sleep(3);
+		time.sleep(1);
 		while True:
 			createSSID();
-			killAP();
-			lookforjoin();
-			time.sleep(10);
-			readmdk3();
+			#killAP();
+			#lookforjoin();
+			time.sleep(3);
+			#readmdk3();
 	except KeyboardInterrupt:
 		log ("Cleaning Up...")
 		cleanup();
